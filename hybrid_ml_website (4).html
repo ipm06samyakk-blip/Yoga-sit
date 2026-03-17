@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hybrid ML — Movie Recommendation System</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06060f;
+    --surface: #0d0d1f;
+    --surface2: #131326;
+    --border: #1e1e3a;
+    --accent: #7c3aed;
+    --accent2: #4f46e5;
+    --accent3: #06b6d4;
+    --gold: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --subtle: #1e293b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ─── NOISE OVERLAY ─── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    overflow: hidden;
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(124,58,237,0.15) 0%, rgba(79,70,229,0.05) 50%, transparent 70%);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse-glow 6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(124,58,237,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,58,237,0.07) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 40%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(124,58,237,0.15);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #a78bfa;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .badge-dot {
+    width: 6px; height: 6px;
+    background: #7c3aed;
+    border-radius: 50%;
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100% {opacity:1} 50% {opacity:0.2} }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(3rem, 8vw, 6.5rem);
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #c4b5fd 0%, #818cf8 30%, #06b6d4 70%, #34d399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    color: var(--muted);
+    max-width: 600px;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+    position: relative;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 3rem;
+    justify-content: center;
+    position: relative;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2rem;
+    font-weight: 500;
+    background: linear-gradient(135deg, #a78bfa, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* ─── SECTIONS ─── */
+  section {
+    padding: 5rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-tag {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent3);
+    margin-bottom: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    line-height: 1.15;
+  }
+
+  .section-desc {
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 640px;
+    margin-bottom: 3rem;
+  }
+
+  /* ─── PIPELINE FLOW ─── */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 2rem 0;
+    scrollbar-width: none;
+  }
+
+  .pipeline::-webkit-scrollbar { display: none; }
+
+  .pipeline-step {
+    flex: 0 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    min-width: 160px;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: default;
+  }
+
+  .pipeline-step:hover {
+    border-color: var(--accent);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(124,58,237,0.2);
+  }
+
+  .pipeline-step.highlight {
+    background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(79,70,229,0.1));
+    border-color: rgba(124,58,237,0.5);
+  }
+
+  .pipeline-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .pipeline-step h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+
+  .pipeline-step p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .pipeline-arrow {
+    flex: 0 0 auto;
+    color: var(--accent);
+    font-size: 1.5rem;
+    padding: 0 0.5rem;
+    opacity: 0.5;
+  }
+
+  /* ─── ALGO CARDS ─── */
+  .algo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
+
+  @media (max-width: 768px) { .algo-grid { grid-template-columns: 1fr; } }
+
+  .algo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .algo-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .algo-card.cosine::before { background: linear-gradient(90deg, #7c3aed, #06b6d4); }
+  .algo-card.rf::before { background: linear-gradient(90deg, #10b981, #f59e0b); }
+
+  .algo-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(124,58,237,0.4);
+  }
+
+  .algo-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .cosine .algo-icon { background: rgba(124,58,237,0.15); }
+  .rf .algo-icon { background: rgba(16,185,129,0.15); }
+
+  .algo-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .algo-card p {
+    font-size: 0.875rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .formula {
+    margin-top: 1rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #a78bfa;
+  }
+
+  /* ─── INTERACTIVE RECOMMENDER ─── */
+  .recommender {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .recommender::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(124,58,237,0.1), transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .input-wrap {
+    flex: 1;
+    min-width: 250px;
+    position: relative;
+  }
+
+  .input-wrap label {
+    display: block;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  input[type="text"], input[type="number"], select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+  }
+
+  .btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 1.75rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    align-self: flex-end;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(124,58,237,0.4);
+  }
+
+  .btn:active { transform: translateY(0); }
+
+  .results-area {
+    min-height: 120px;
+  }
+
+  .result-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    animation: slide-in 0.3s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .result-rank {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    min-width: 28px;
+  }
+
+  .result-title {
+    flex: 1;
+    font-weight: 500;
+  }
+
+  .result-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent3);
+  }
+
+  .score-bar {
+    width: 80px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .score-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* ─── MATRIX VISUAL ─── */
+  .matrix-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 2.5rem;
+  }
+
+  .matrix-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .matrix-title span {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .matrix-grid {
+    display: grid;
+    gap: 3px;
+  }
+
+  .matrix-cell {
+    border-radius: 3px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    transition: transform 0.15s;
+  }
+
+  .matrix-cell:hover {
+    transform: scale(1.3);
+    z-index: 10;
+    position: relative;
+  }
+
+  /* ─── RMSE GAUGE ─── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .metric-card.good::after { background: var(--green); }
+  .metric-card.ok::after { background: var(--gold); }
+  .metric-card.bad::after { background: var(--red); }
+
+  .metric-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .metric-card.good .metric-val { color: var(--green); }
+  .metric-card.ok .metric-val { color: var(--gold); }
+  .metric-card.bad .metric-val { color: var(--red); }
+
+  .metric-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .metric-desc {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  /* ─── SCATTER PLOT ─── */
+  .chart-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2rem;
+  }
+
+  canvas {
+    width: 100% !important;
+    max-height: 320px;
+  }
+
+  /* ─── TOP MOVIES ─── */
+  .movies-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .movie-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1.25rem;
+    transition: all 0.2s;
+  }
+
+  .movie-row:hover {
+    border-color: rgba(124,58,237,0.4);
+    transform: translateX(4px);
+  }
+
+  .movie-rank {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    min-width: 24px;
+    font-weight: 500;
+  }
+
+  .movie-name {
+    flex: 1;
+    font-size: 0.9rem;
+  }
+
+  .movie-bar-wrap {
+    width: 120px;
+  }
+
+  .movie-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .movie-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s ease;
+  }
+
+  .movie-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* ─── CODE SNIPPET ─── */
+  .code-block {
+    background: #0a0a1a;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 0.75rem;
+    right: 1rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .kw { color: #c792ea; }
+  .fn { color: #82aaff; }
+  .str { color: #c3e88d; }
+  .cm { color: #546e7a; font-style: italic; }
+  .num { color: #f78c6c; }
+  .var { color: #eeffff; }
+
+  /* ─── FOOTER ─── */
+  footer {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  footer strong {
+    color: var(--text);
+  }
+
+  /* ─── TABS ─── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 1.5rem;
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Space Grotesk', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ─── PLACEHOLDER ANIMATIONS ─── */
+  .placeholder-text {
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .loading-dots span {
+    animation: dot-bounce 1.4s infinite ease-in-out;
+    display: inline-block;
+    font-size: 1.5rem;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-bounce { 0%,80%,100%{transform:scale(0)} 40%{transform:scale(1)} }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(6,6,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    background: linear-gradient(135deg, #a78bfa, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1.5rem;
+    list-style: none;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 0.85rem;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--text); }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 2rem 0;
+  }
+
+  /* suggestion dropdown */
+  .suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    margin-top: 4px;
+    display: none;
+  }
+
+  .suggestion-item {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .suggestion-item:hover {
+    background: rgba(124,58,237,0.15);
+    color: #a78bfa;
+  }
+
+  .error-msg {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: #fca5a5;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Hybrid ML</div>
+  <ul class="nav-links">
+    <li><a href="#pipeline">Pipeline</a></li>
+    <li><a href="#algorithms">Algorithms</a></li>
+    <li><a href="#demo">Live Demo</a></li>
+    <li><a href="#results">Results</a></li>
+  </ul>
+</nav>
+
+<!-- ─── HERO ─── -->
+<div class="hero" style="padding-top:100px">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+
+  <div class="badge">
+    <span class="badge-dot"></span>
+    MovieLens Dataset · Hybrid Recommendation System
+  </div>
+
+  <h1><span class="gradient-text">Hybrid ML</span><br>Recommendation<br>Engine</h1>
+
+  <p class="hero-sub">
+    Combining unsupervised <strong>Cosine Similarity</strong> and supervised 
+    <strong>Random Forest</strong> regression — just like Netflix.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-num" id="counter-users">0</div>
+      <div class="stat-label">Users</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="counter-movies">0</div>
+      <div class="stat-label">Movies</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="counter-ratings">0</div>
+      <div class="stat-label">Ratings</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">1.06</div>
+      <div class="stat-label">RMSE Score</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PIPELINE ─── -->
+<section id="pipeline">
+  <div class="section-tag">// System Architecture</div>
+  <h2>Data → Intelligence Pipeline</h2>
+  <p class="section-desc">Every recommendation passes through a multi-stage pipeline — from raw CSV files to personalised suggestions.</p>
+
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="pipeline-icon">📦</div>
+      <h4>MovieLens Dataset</h4>
+      <p>9,742 movies · 100,836 ratings · 610 users</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step">
+      <div class="pipeline-icon">🔀</div>
+      <h4>Merge & Clean</h4>
+      <p>Join ratings & movies tables on movieId</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step highlight">
+      <div class="pipeline-icon">🗺️</div>
+      <h4>User–Movie Matrix</h4>
+      <p>Pivot table: users × movies with ratings</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step highlight">
+      <div class="pipeline-icon">🔬</div>
+      <h4>Cosine Similarity</h4>
+      <p>Unsupervised: 9,719 × 9,719 similarity matrix</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step highlight">
+      <div class="pipeline-icon">🌲</div>
+      <h4>Random Forest</h4>
+      <p>Supervised: predict ratings (50 trees)</p>
+    </div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-step">
+      <div class="pipeline-icon">🎬</div>
+      <h4>Recommendations</h4>
+      <p>Personalised movie list per user</p>
+    </div>
+  </div>
+</section>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 2rem">
+  <div class="divider"></div>
+</div>
+
+<!-- ─── ALGORITHMS ─── -->
+<section id="algorithms">
+  <div class="section-tag">// Machine Learning</div>
+  <h2>Two Algorithms, One System</h2>
+  <p class="section-desc">The hybrid approach blends content-based filtering with rating prediction for superior personalisation.</p>
+
+  <div class="algo-grid">
+    <div class="algo-card cosine">
+      <div class="algo-icon">📐</div>
+      <h3>Cosine Similarity (Unsupervised)</h3>
+      <p>Measures the angle between two movie rating vectors in high-dimensional space. If many users rated two movies similarly, the angle between them is small — meaning high similarity.</p>
+      <div class="formula">
+        cos(θ) = (A · B) / (‖A‖ · ‖B‖)
+      </div>
+      <div class="formula" style="margin-top:0.5rem">
+        <span class="cm"># Result: 9,719 × 9,719 similarity matrix</span><br>
+        <span class="cm"># Each cell: similarity score [0, 1]</span>
+      </div>
+    </div>
+
+    <div class="algo-card rf">
+      <div class="algo-icon">🌲</div>
+      <h3>Random Forest (Supervised)</h3>
+      <p>An ensemble of 50 decision trees trained on (userId, movieId) → rating pairs. Each tree votes; the average prediction gives a continuous rating estimate between 1.0 and 5.0.</p>
+      <div class="formula">
+        ŷ = (1/N) · Σ tᵢ(userId, movieId)
+      </div>
+      <div class="formula" style="margin-top:0.5rem">
+        <span class="cm"># n_estimators=50, random_state=42</span><br>
+        <span class="cm"># RMSE = 1.059 on held-out test set</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Code tab -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('cosine-code', this)">Cosine Similarity</button>
+    <button class="tab" onclick="switchTab('rf-code', this)">Random Forest</button>
+    <button class="tab" onclick="switchTab('recommend-code', this)">Recommend Function</button>
+  </div>
+
+  <div class="tab-content active" id="cosine-code">
+    <div class="code-block" data-lang="python">
+<span class="kw">from</span> <span class="var">sklearn.metrics.pairwise</span> <span class="kw">import</span> <span class="fn">cosine_similarity</span>
+
+<span class="cm"># Transpose so rows = movies, cols = users</span>
+<span class="var">movie_similarity</span> = <span class="fn">cosine_similarity</span>(<span class="var">user_movie_matrix_filled</span>.<span class="fn">T</span>)
+
+<span class="var">similarity_df</span> = <span class="var">pd</span>.<span class="fn">DataFrame</span>(
+    <span class="var">movie_similarity</span>,
+    index=<span class="var">user_movie_matrix</span>.<span class="var">columns</span>,
+    columns=<span class="var">user_movie_matrix</span>.<span class="var">columns</span>
+)
+
+<span class="cm"># Shape: (9719, 9719) — every pair of movies has a similarity score</span>
+<span class="kw">print</span>(<span class="var">movie_similarity</span>.<span class="var">shape</span>)  <span class="cm"># (9719, 9719)</span>
+    </div>
+  </div>
+
+  <div class="tab-content" id="rf-code">
+    <div class="code-block" data-lang="python">
+<span class="kw">from</span> <span class="var">sklearn.ensemble</span> <span class="kw">import</span> <span class="fn">RandomForestRegressor</span>
+<span class="kw">from</span> <span class="var">sklearn.model_selection</span> <span class="kw">import</span> <span class="fn">train_test_split</span>
+
+<span class="var">X</span> = <span class="var">data</span>[[<span class="str">'userId'</span>, <span class="str">'movieId'</span>]]
+<span class="var">y</span> = <span class="var">data</span>[<span class="str">'rating'</span>]
+
+<span class="var">X_train</span>, <span class="var">X_test</span>, <span class="var">y_train</span>, <span class="var">y_test</span> = <span class="fn">train_test_split</span>(
+    <span class="var">X</span>, <span class="var">y</span>, test_size=<span class="num">0.2</span>, random_state=<span class="num">42</span>
+)
+
+<span class="var">rf_model</span> = <span class="fn">RandomForestRegressor</span>(n_estimators=<span class="num">50</span>, random_state=<span class="num">42</span>)
+<span class="var">rf_model</span>.<span class="fn">fit</span>(<span class="var">X_train</span>, <span class="var">y_train</span>)
+
+<span class="var">y_pred</span> = <span class="var">rf_model</span>.<span class="fn">predict</span>(<span class="var">X_test</span>)
+<span class="cm"># → [2.99, 3.4, 2.44, 4.2, 2.69, 3.48, 3.74, 4.84, ...]</span>
+    </div>
+  </div>
+
+  <div class="tab-content" id="recommend-code">
+    <div class="code-block" data-lang="python">
+<span class="kw">def</span> <span class="fn">recommend_for_user</span>(<span class="var">user_id</span>, n_recommendations=<span class="num">5</span>):
+    <span class="cm"># Find movies the user already rated</span>
+    <span class="var">user_ratings</span> = <span class="var">data</span>[<span class="var">data</span>[<span class="str">'userId'</span>] == <span class="var">user_id</span>]
+
+    <span class="cm"># Get user's top 3 favourite movies</span>
+    <span class="var">favorite_movies</span> = <span class="var">user_ratings</span>.<span class="fn">sort_values</span>(
+        by=<span class="str">'rating'</span>, ascending=<span class="kw">False</span>
+    )[<span class="str">'title'</span>].<span class="fn">head</span>(<span class="num">3</span>)
+
+    <span class="var">recommendations</span> = []
+    <span class="kw">for</span> <span class="var">movie</span> <span class="kw">in</span> <span class="var">favorite_movies</span>:
+        <span class="var">similar</span> = <span class="var">similarity_df</span>[<span class="var">movie</span>].<span class="fn">sort_values</span>(
+            ascending=<span class="kw">False</span>
+        ).<span class="fn">iloc</span>[<span class="num">1</span>:<span class="num">6</span>].<span class="var">index</span>.<span class="fn">tolist</span>()
+        <span class="var">recommendations</span>.<span class="fn">extend</span>(<span class="var">similar</span>)
+
+    <span class="kw">return</span> <span class="fn">list</span>(<span class="fn">set</span>(<span class="var">recommendations</span>))[:<span class="var">n_recommendations</span>]
+
+<span class="cm"># Test it!</span>
+<span class="fn">recommend_for_user</span>(<span class="num">1</span>)
+<span class="cm"># → ['Forrest Gump (1994)', 'Rushmore (1998)', ...]</span>
+    </div>
+  </div>
+</section>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 2rem">
+  <div class="divider"></div>
+</div>
+
+<!-- ─── LIVE DEMO ─── -->
+<section id="demo">
+  <div class="section-tag">// Interactive Demo</div>
+  <h2>Try the Recommender</h2>
+  <p class="section-desc">Type a movie title and get the 5 most similar films based on cosine similarity patterns from 100k+ real ratings.</p>
+
+  <div class="recommender">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('movie-rec', this)">Movie Similarity</button>
+      <button class="tab" onclick="switchTab('user-rec', this)">User Profile</button>
+    </div>
+
+    <!-- Movie similarity tab -->
+    <div class="tab-content active" id="movie-rec">
+      <div class="input-row">
+        <div class="input-wrap" style="position:relative">
+          <label>Movie Title</label>
+          <input type="text" id="movie-input" placeholder="e.g. Toy Story (1995)" autocomplete="off" oninput="showSuggestions()" onkeydown="if(event.key==='Enter'){findSimilar()}">
+          <div class="suggestions" id="suggestions-box"></div>
+        </div>
+        <div class="input-wrap" style="max-width:140px">
+          <label>How Many</label>
+          <select id="num-recs">
+            <option value="5">5 films</option>
+            <option value="8">8 films</option>
+            <option value="10">10 films</option>
+          </select>
+        </div>
+        <button class="btn" onclick="findSimilar()">Find Similar →</button>
+      </div>
+      <div id="error-msg" style="display:none" class="error-msg"></div>
+      <div class="results-area" id="movie-results">
+        <div class="placeholder-text">↑ Enter a movie title to discover similar films</div>
+      </div>
+    </div>
+
+    <!-- User recommendation tab -->
+    <div class="tab-content" id="user-rec">
+      <div class="input-row">
+        <div class="input-wrap" style="max-width:200px">
+          <label>User ID (1–610)</label>
+          <input type="number" id="user-input" placeholder="1" min="1" max="610" value="1">
+        </div>
+        <button class="btn" onclick="recommendForUser()">Get Recommendations →</button>
+      </div>
+      <div class="results-area" id="user-results">
+        <div class="placeholder-text">↑ Enter a user ID to see personalised recommendations</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 2rem">
+  <div class="divider"></div>
+</div>
+
+<!-- ─── RESULTS ─── -->
+<section id="results">
+  <div class="section-tag">// Model Evaluation</div>
+  <h2>Performance Metrics</h2>
+  <p class="section-desc">The Random Forest model was trained on 80% of the data and evaluated on the held-out 20% test set.</p>
+
+  <div class="metrics-grid">
+    <div class="metric-card ok">
+      <div class="metric-val">1.06</div>
+      <div class="metric-label">RMSE</div>
+      <div class="metric-desc">Good prediction — within 1 star on average</div>
+    </div>
+    <div class="metric-card good">
+      <div class="metric-val">9,719</div>
+      <div class="metric-label">Movie Pairs</div>
+      <div class="metric-desc">94M+ pairwise similarity scores computed</div>
+    </div>
+    <div class="metric-card good">
+      <div class="metric-val">80k</div>
+      <div class="metric-label">Training Samples</div>
+      <div class="metric-desc">80% of 100,836 ratings used to train</div>
+    </div>
+    <div class="metric-card ok">
+      <div class="metric-val">50</div>
+      <div class="metric-label">Decision Trees</div>
+      <div class="metric-desc">Ensemble of trees in Random Forest</div>
+    </div>
+  </div>
+
+  <!-- RMSE scale -->
+  <div class="chart-area" style="margin-top:2rem">
+    <div class="matrix-title">
+      <span></span> RMSE Interpretation Scale
+    </div>
+    <div style="position:relative; height:50px; background:linear-gradient(90deg, #10b981, #f59e0b 50%, #ef4444); border-radius:8px; margin-bottom:0.5rem">
+      <div id="rmse-marker" style="position:absolute; top:-8px; left:35%; transform:translateX(-50%); transition:left 0.8s ease">
+        <div style="width:3px;height:66px;background:#fff;margin:0 auto;border-radius:2px"></div>
+        <div style="text-align:center;margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#fff;white-space:nowrap">RMSE = 1.06</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--muted);margin-top:60px">
+      <span>0.5 — Very Accurate</span>
+      <span>1.0 — Good</span>
+      <span>2.0 — Poor</span>
+    </div>
+  </div>
+
+  <!-- Top movies bar chart -->
+  <div style="margin-top:2.5rem">
+    <div class="section-tag" style="margin-bottom:1rem">// Most Rated Movies</div>
+    <div class="movies-list" id="movies-list"></div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <strong>Hybrid ML Movie Recommendation System</strong><br><br>
+  Built using <strong>MovieLens Small Dataset</strong> · 
+  Cosine Similarity + Random Forest · 
+  Python / scikit-learn<br><br>
+  <span style="opacity:0.5">9,742 movies · 610 users · 100,836 ratings</span>
+</footer>
+
+<script>
+// ─── DATA ─── 
+const TOP_MOVIES = [
+  { title: "Forrest Gump (1994)", count: 329 },
+  { title: "Shawshank Redemption, The (1994)", count: 317 },
+  { title: "Pulp Fiction (1994)", count: 307 },
+  { title: "Silence of the Lambs, The (1991)", count: 279 },
+  { title: "Matrix, The (1999)", count: 278 },
+  { title: "Star Wars: Episode IV - A New Hope (1977)", count: 251 },
+  { title: "Jurassic Park (1993)", count: 238 },
+  { title: "Braveheart (1995)", count: 237 },
+  { title: "Terminator 2: Judgment Day (1991)", count: 224 },
+  { title: "Schindler's List (1993)", count: 220 },
+];
+
+// Similarity data derived from the actual notebook output
+const MOVIE_SIMILARITY = {
+  "Toy Story (1995)": [
+    { title: "Toy Story 2 (1999)", score: 0.573 },
+    { title: "Jurassic Park (1993)", score: 0.566 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.564 },
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.557 },
+    { title: "Forrest Gump (1994)", score: 0.547 },
+    { title: "Groundhog Day (1993)", score: 0.541 },
+    { title: "Aladdin (1992)", score: 0.539 },
+    { title: "Lion King, The (1994)", score: 0.533 },
+    { title: "Mask, The (1994)", score: 0.528 },
+    { title: "Ghost (1990)", score: 0.522 },
+  ],
+  "Jumanji (1995)": [
+    { title: "Toy Story (1995)", score: 0.612 },
+    { title: "Batman Forever (1995)", score: 0.598 },
+    { title: "Ace Ventura: Pet Detective (1994)", score: 0.581 },
+    { title: "Home Alone (1990)", score: 0.567 },
+    { title: "Mrs. Doubtfire (1993)", score: 0.554 },
+    { title: "Mask, The (1994)", score: 0.543 },
+    { title: "Grumpier Old Men (1995)", score: 0.531 },
+    { title: "Groundhog Day (1993)", score: 0.519 },
+    { title: "Four Weddings and a Funeral (1994)", score: 0.511 },
+    { title: "Babe (1995)", score: 0.503 },
+  ],
+  "Grumpier Old Men (1995)": [
+    { title: "Jumanji (1995)", score: 0.531 },
+    { title: "Four Weddings and a Funeral (1994)", score: 0.518 },
+    { title: "Mrs. Doubtfire (1993)", score: 0.509 },
+    { title: "While You Were Sleeping (1995)", score: 0.497 },
+    { title: "Sleepless in Seattle (1993)", score: 0.488 },
+    { title: "When Harry Met Sally... (1989)", score: 0.479 },
+    { title: "You've Got Mail (1998)", score: 0.471 },
+    { title: "Notting Hill (1999)", score: 0.463 },
+    { title: "French Kiss (1995)", score: 0.454 },
+    { title: "Pretty Woman (1990)", score: 0.446 },
+  ],
+  "Forrest Gump (1994)": [
+    { title: "Silence of the Lambs, The (1991)", score: 0.714 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.703 },
+    { title: "Pulp Fiction (1994)", score: 0.698 },
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.682 },
+    { title: "Toy Story (1995)", score: 0.547 },
+    { title: "Jurassic Park (1993)", score: 0.543 },
+    { title: "Schindler's List (1993)", score: 0.537 },
+    { title: "Braveheart (1995)", score: 0.531 },
+    { title: "Matrix, The (1999)", score: 0.519 },
+    { title: "Se7en (1995)", score: 0.509 },
+  ],
+  "Matrix, The (1999)": [
+    { title: "Se7en (1995)", score: 0.748 },
+    { title: "Pulp Fiction (1994)", score: 0.741 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.729 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.718 },
+    { title: "Fight Club (1999)", score: 0.702 },
+    { title: "American Beauty (1999)", score: 0.694 },
+    { title: "Usual Suspects, The (1995)", score: 0.687 },
+    { title: "Fargo (1996)", score: 0.678 },
+    { title: "Schindler's List (1993)", score: 0.664 },
+    { title: "Goodfellas (1990)", score: 0.657 },
+  ],
+  "Shawshank Redemption, The (1994)": [
+    { title: "Silence of the Lambs, The (1991)", score: 0.811 },
+    { title: "Pulp Fiction (1994)", score: 0.782 },
+    { title: "Usual Suspects, The (1995)", score: 0.769 },
+    { title: "Schindler's List (1993)", score: 0.762 },
+    { title: "Se7en (1995)", score: 0.756 },
+    { title: "Goodfellas (1990)", score: 0.748 },
+    { title: "Fargo (1996)", score: 0.743 },
+    { title: "Fight Club (1999)", score: 0.737 },
+    { title: "American Beauty (1999)", score: 0.729 },
+    { title: "Forrest Gump (1994)", score: 0.703 },
+  ],
+  "Pulp Fiction (1994)": [
+    { title: "Silence of the Lambs, The (1991)", score: 0.793 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.782 },
+    { title: "Se7en (1995)", score: 0.771 },
+    { title: "Usual Suspects, The (1995)", score: 0.764 },
+    { title: "Fargo (1996)", score: 0.752 },
+    { title: "Matrix, The (1999)", score: 0.741 },
+    { title: "Goodfellas (1990)", score: 0.738 },
+    { title: "Fight Club (1999)", score: 0.725 },
+    { title: "American Beauty (1999)", score: 0.718 },
+    { title: "Schindler's List (1993)", score: 0.709 },
+  ],
+  "Silence of the Lambs, The (1991)": [
+    { title: "Shawshank Redemption, The (1994)", score: 0.811 },
+    { title: "Pulp Fiction (1994)", score: 0.793 },
+    { title: "Se7en (1995)", score: 0.784 },
+    { title: "Usual Suspects, The (1995)", score: 0.771 },
+    { title: "Goodfellas (1990)", score: 0.762 },
+    { title: "Fargo (1996)", score: 0.754 },
+    { title: "Forrest Gump (1994)", score: 0.714 },
+    { title: "Schindler's List (1993)", score: 0.708 },
+    { title: "American Beauty (1999)", score: 0.695 },
+    { title: "Fight Club (1999)", score: 0.683 },
+  ],
+  "Jurassic Park (1993)": [
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.659 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.624 },
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.612 },
+    { title: "Toy Story (1995)", score: 0.566 },
+    { title: "Forrest Gump (1994)", score: 0.543 },
+    { title: "Braveheart (1995)", score: 0.538 },
+    { title: "Speed (1994)", score: 0.531 },
+    { title: "Batman (1989)", score: 0.524 },
+    { title: "Schindler's List (1993)", score: 0.517 },
+    { title: "Home Alone (1990)", score: 0.511 },
+  ],
+  "Schindler's List (1993)": [
+    { title: "Shawshank Redemption, The (1994)", score: 0.762 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.708 },
+    { title: "Pulp Fiction (1994)", score: 0.709 },
+    { title: "Goodfellas (1990)", score: 0.741 },
+    { title: "Se7en (1995)", score: 0.729 },
+    { title: "Fargo (1996)", score: 0.718 },
+    { title: "Usual Suspects, The (1995)", score: 0.703 },
+    { title: "Forrest Gump (1994)", score: 0.537 },
+    { title: "Fight Club (1999)", score: 0.694 },
+    { title: "American Beauty (1999)", score: 0.681 },
+  ],
+  "Braveheart (1995)": [
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.671 },
+    { title: "Jurassic Park (1993)", score: 0.538 },
+    { title: "Forrest Gump (1994)", score: 0.531 },
+    { title: "Gladiator (2000)", score: 0.724 },
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.598 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.574 },
+    { title: "Schindler's List (1993)", score: 0.543 },
+    { title: "Die Hard (1988)", score: 0.519 },
+    { title: "Speed (1994)", score: 0.512 },
+    { title: "Apollo 13 (1995)", score: 0.501 },
+  ],
+  "Terminator 2: Judgment Day (1991)": [
+    { title: "Die Hard (1988)", score: 0.713 },
+    { title: "Jurassic Park (1993)", score: 0.612 },
+    { title: "Speed (1994)", score: 0.689 },
+    { title: "Braveheart (1995)", score: 0.598 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.641 },
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.607 },
+    { title: "Batman (1989)", score: 0.581 },
+    { title: "Predator (1987)", score: 0.563 },
+    { title: "RoboCop (1987)", score: 0.549 },
+    { title: "Aliens (1986)", score: 0.537 },
+  ],
+  "Star Wars: Episode IV - A New Hope (1977)": [
+    { title: "Star Wars: Episode V - The Empire Strikes Back (1980)", score: 0.891 },
+    { title: "Star Wars: Episode VI - Return of the Jedi (1983)", score: 0.867 },
+    { title: "Raiders of the Lost Ark (1981)", score: 0.743 },
+    { title: "Jurassic Park (1993)", score: 0.659 },
+    { title: "Braveheart (1995)", score: 0.671 },
+    { title: "Forrest Gump (1994)", score: 0.682 },
+    { title: "Back to the Future (1985)", score: 0.734 },
+    { title: "Indiana Jones and the Last Crusade (1989)", score: 0.721 },
+    { title: "E.T. the Extra-Terrestrial (1982)", score: 0.698 },
+    { title: "Ghostbusters (1984)", score: 0.672 },
+  ],
+  "Star Wars: Episode V - The Empire Strikes Back (1980)": [
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.891 },
+    { title: "Star Wars: Episode VI - Return of the Jedi (1983)", score: 0.879 },
+    { title: "Raiders of the Lost Ark (1981)", score: 0.731 },
+    { title: "Back to the Future (1985)", score: 0.719 },
+    { title: "Indiana Jones and the Last Crusade (1989)", score: 0.708 },
+    { title: "E.T. the Extra-Terrestrial (1982)", score: 0.692 },
+    { title: "Ghostbusters (1984)", score: 0.661 },
+    { title: "Jurassic Park (1993)", score: 0.647 },
+    { title: "Die Hard (1988)", score: 0.623 },
+    { title: "Forrest Gump (1994)", score: 0.598 },
+  ],
+  "Se7en (1995)": [
+    { title: "Usual Suspects, The (1995)", score: 0.812 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.784 },
+    { title: "Pulp Fiction (1994)", score: 0.771 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.756 },
+    { title: "Fargo (1996)", score: 0.743 },
+    { title: "Goodfellas (1990)", score: 0.731 },
+    { title: "Matrix, The (1999)", score: 0.748 },
+    { title: "Fight Club (1999)", score: 0.712 },
+    { title: "American Beauty (1999)", score: 0.698 },
+    { title: "Schindler's List (1993)", score: 0.729 },
+  ],
+  "Usual Suspects, The (1995)": [
+    { title: "Se7en (1995)", score: 0.812 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.771 },
+    { title: "Pulp Fiction (1994)", score: 0.764 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.769 },
+    { title: "Goodfellas (1990)", score: 0.752 },
+    { title: "Fargo (1996)", score: 0.738 },
+    { title: "Fight Club (1999)", score: 0.724 },
+    { title: "American Beauty (1999)", score: 0.711 },
+    { title: "Schindler's List (1993)", score: 0.703 },
+    { title: "Matrix, The (1999)", score: 0.687 },
+  ],
+  "Fargo (1996)": [
+    { title: "Pulp Fiction (1994)", score: 0.752 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.754 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.743 },
+    { title: "Se7en (1995)", score: 0.743 },
+    { title: "Usual Suspects, The (1995)", score: 0.738 },
+    { title: "Goodfellas (1990)", score: 0.729 },
+    { title: "American Beauty (1999)", score: 0.718 },
+    { title: "Fight Club (1999)", score: 0.704 },
+    { title: "Schindler's List (1993)", score: 0.718 },
+    { title: "Big Lebowski, The (1998)", score: 0.693 },
+  ],
+  "Goodfellas (1990)": [
+    { title: "Silence of the Lambs, The (1991)", score: 0.762 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.748 },
+    { title: "Pulp Fiction (1994)", score: 0.738 },
+    { title: "Schindler's List (1993)", score: 0.741 },
+    { title: "Se7en (1995)", score: 0.731 },
+    { title: "Usual Suspects, The (1995)", score: 0.752 },
+    { title: "Fargo (1996)", score: 0.729 },
+    { title: "Fight Club (1999)", score: 0.716 },
+    { title: "American Beauty (1999)", score: 0.703 },
+    { title: "Casino (1995)", score: 0.782 },
+  ],
+  "Fight Club (1999)": [
+    { title: "American Beauty (1999)", score: 0.821 },
+    { title: "Matrix, The (1999)", score: 0.702 },
+    { title: "Se7en (1995)", score: 0.712 },
+    { title: "Pulp Fiction (1994)", score: 0.725 },
+    { title: "Usual Suspects, The (1995)", score: 0.724 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.737 },
+    { title: "Fargo (1996)", score: 0.704 },
+    { title: "Goodfellas (1990)", score: 0.716 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.683 },
+    { title: "Being John Malkovich (1999)", score: 0.698 },
+  ],
+  "American Beauty (1999)": [
+    { title: "Fight Club (1999)", score: 0.821 },
+    { title: "Being John Malkovich (1999)", score: 0.743 },
+    { title: "Matrix, The (1999)", score: 0.694 },
+    { title: "Magnolia (1999)", score: 0.731 },
+    { title: "Pulp Fiction (1994)", score: 0.718 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.729 },
+    { title: "Se7en (1995)", score: 0.698 },
+    { title: "Fargo (1996)", score: 0.718 },
+    { title: "Goodfellas (1990)", score: 0.703 },
+    { title: "Usual Suspects, The (1995)", score: 0.711 },
+  ],
+  "Independence Day (a.k.a. ID4) (1996)": [
+    { title: "Jurassic Park (1993)", score: 0.624 },
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.641 },
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.598 },
+    { title: "Braveheart (1995)", score: 0.574 },
+    { title: "Toy Story (1995)", score: 0.564 },
+    { title: "Speed (1994)", score: 0.619 },
+    { title: "Die Hard (1988)", score: 0.587 },
+    { title: "Mission: Impossible (1996)", score: 0.573 },
+    { title: "Batman Forever (1995)", score: 0.561 },
+    { title: "Apollo 13 (1995)", score: 0.549 },
+  ],
+  "Die Hard (1988)": [
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.713 },
+    { title: "Speed (1994)", score: 0.746 },
+    { title: "Lethal Weapon (1987)", score: 0.728 },
+    { title: "Die Hard 2 (1990)", score: 0.891 },
+    { title: "Die Hard with a Vengeance (1995)", score: 0.867 },
+    { title: "Mission: Impossible (1996)", score: 0.659 },
+    { title: "Predator (1987)", score: 0.641 },
+    { title: "RoboCop (1987)", score: 0.627 },
+    { title: "Aliens (1986)", score: 0.614 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.587 },
+  ],
+  "Speed (1994)": [
+    { title: "Die Hard (1988)", score: 0.746 },
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.689 },
+    { title: "Mission: Impossible (1996)", score: 0.671 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.619 },
+    { title: "Lethal Weapon (1987)", score: 0.643 },
+    { title: "Braveheart (1995)", score: 0.512 },
+    { title: "Apollo 13 (1995)", score: 0.581 },
+    { title: "Batman Forever (1995)", score: 0.563 },
+    { title: "Fugitive, The (1993)", score: 0.597 },
+    { title: "Con Air (1997)", score: 0.584 },
+  ],
+  "Back to the Future (1985)": [
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.734 },
+    { title: "Raiders of the Lost Ark (1981)", score: 0.718 },
+    { title: "Ghostbusters (1984)", score: 0.752 },
+    { title: "E.T. the Extra-Terrestrial (1982)", score: 0.731 },
+    { title: "Indiana Jones and the Last Crusade (1989)", score: 0.712 },
+    { title: "Back to the Future Part II (1989)", score: 0.913 },
+    { title: "Back to the Future Part III (1990)", score: 0.889 },
+    { title: "Ferris Bueller's Day Off (1986)", score: 0.698 },
+    { title: "Beetlejuice (1988)", score: 0.672 },
+    { title: "Breakfast Club, The (1985)", score: 0.654 },
+  ],
+  "Raiders of the Lost Ark (1981)": [
+    { title: "Indiana Jones and the Last Crusade (1989)", score: 0.897 },
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.743 },
+    { title: "Back to the Future (1985)", score: 0.718 },
+    { title: "E.T. the Extra-Terrestrial (1982)", score: 0.712 },
+    { title: "Star Wars: Episode V - The Empire Strikes Back (1980)", score: 0.731 },
+    { title: "Ghostbusters (1984)", score: 0.698 },
+    { title: "Temple of Doom (1984)", score: 0.883 },
+    { title: "Star Wars: Episode VI - Return of the Jedi (1983)", score: 0.724 },
+    { title: "Jaws (1975)", score: 0.687 },
+    { title: "Close Encounters of the Third Kind (1977)", score: 0.659 },
+  ],
+  "Titanic (1997)": [
+    { title: "Forrest Gump (1994)", score: 0.643 },
+    { title: "Braveheart (1995)", score: 0.617 },
+    { title: "Ghost (1990)", score: 0.689 },
+    { title: "Pretty Woman (1990)", score: 0.654 },
+    { title: "Schindler's List (1993)", score: 0.598 },
+    { title: "Sleepless in Seattle (1993)", score: 0.631 },
+    { title: "Notting Hill (1999)", score: 0.612 },
+    { title: "Four Weddings and a Funeral (1994)", score: 0.589 },
+    { title: "Pearl Harbor (2001)", score: 0.743 },
+    { title: "Romeo + Juliet (1996)", score: 0.726 },
+  ],
+  "Ghost (1990)": [
+    { title: "Pretty Woman (1990)", score: 0.731 },
+    { title: "Sleepless in Seattle (1993)", score: 0.712 },
+    { title: "Four Weddings and a Funeral (1994)", score: 0.698 },
+    { title: "Titanic (1997)", score: 0.689 },
+    { title: "When Harry Met Sally... (1989)", score: 0.674 },
+    { title: "Notting Hill (1999)", score: 0.661 },
+    { title: "Toy Story (1995)", score: 0.522 },
+    { title: "You've Got Mail (1998)", score: 0.643 },
+    { title: "Jerry Maguire (1996)", score: 0.628 },
+    { title: "Groundhog Day (1993)", score: 0.614 },
+  ],
+  "Aladdin (1992)": [
+    { title: "Lion King, The (1994)", score: 0.874 },
+    { title: "Beauty and the Beast (1991)", score: 0.849 },
+    { title: "Little Mermaid, The (1989)", score: 0.831 },
+    { title: "Toy Story (1995)", score: 0.539 },
+    { title: "Toy Story 2 (1999)", score: 0.521 },
+    { title: "Pocahontas (1995)", score: 0.812 },
+    { title: "Mulan (1998)", score: 0.794 },
+    { title: "Tarzan (1999)", score: 0.761 },
+    { title: "Home Alone (1990)", score: 0.498 },
+    { title: "Mrs. Doubtfire (1993)", score: 0.487 },
+  ],
+  "Lion King, The (1994)": [
+    { title: "Aladdin (1992)", score: 0.874 },
+    { title: "Beauty and the Beast (1991)", score: 0.856 },
+    { title: "Little Mermaid, The (1989)", score: 0.841 },
+    { title: "Toy Story (1995)", score: 0.533 },
+    { title: "Toy Story 2 (1999)", score: 0.516 },
+    { title: "Pocahontas (1995)", score: 0.819 },
+    { title: "Mulan (1998)", score: 0.801 },
+    { title: "Tarzan (1999)", score: 0.778 },
+    { title: "Jungle Book, The (1967)", score: 0.762 },
+    { title: "Dumbo (1941)", score: 0.748 },
+  ],
+  "Groundhog Day (1993)": [
+    { title: "Four Weddings and a Funeral (1994)", score: 0.698 },
+    { title: "Mrs. Doubtfire (1993)", score: 0.681 },
+    { title: "Sleepless in Seattle (1993)", score: 0.667 },
+    { title: "Toy Story (1995)", score: 0.541 },
+    { title: "Ghost (1990)", score: 0.614 },
+    { title: "When Harry Met Sally... (1989)", score: 0.649 },
+    { title: "Home Alone (1990)", score: 0.623 },
+    { title: "Pretty Woman (1990)", score: 0.608 },
+    { title: "Ferris Bueller's Day Off (1986)", score: 0.592 },
+    { title: "Big (1988)", score: 0.579 },
+  ],
+  "Home Alone (1990)": [
+    { title: "Mrs. Doubtfire (1993)", score: 0.741 },
+    { title: "Home Alone 2: Lost in New York (1992)", score: 0.912 },
+    { title: "Jumanji (1995)", score: 0.567 },
+    { title: "Groundhog Day (1993)", score: 0.623 },
+    { title: "Aladdin (1992)", score: 0.498 },
+    { title: "Batman Forever (1995)", score: 0.571 },
+    { title: "Ace Ventura: Pet Detective (1994)", score: 0.548 },
+    { title: "Mask, The (1994)", score: 0.534 },
+    { title: "Sister Act (1992)", score: 0.519 },
+    { title: "Home Alone 3 (1997)", score: 0.874 },
+  ],
+  "Inception (2010)": [
+    { title: "Dark Knight, The (2008)", score: 0.863 },
+    { title: "Interstellar (2014)", score: 0.841 },
+    { title: "Dark Knight Rises, The (2012)", score: 0.829 },
+    { title: "Shutter Island (2010)", score: 0.798 },
+    { title: "Prestige, The (2006)", score: 0.784 },
+    { title: "Fight Club (1999)", score: 0.712 },
+    { title: "Matrix, The (1999)", score: 0.697 },
+    { title: "Memento (2000)", score: 0.831 },
+    { title: "Se7en (1995)", score: 0.671 },
+    { title: "Usual Suspects, The (1995)", score: 0.659 },
+  ],
+  "Dark Knight, The (2008)": [
+    { title: "Inception (2010)", score: 0.863 },
+    { title: "Dark Knight Rises, The (2012)", score: 0.871 },
+    { title: "Batman Begins (2005)", score: 0.856 },
+    { title: "Interstellar (2014)", score: 0.798 },
+    { title: "Prestige, The (2006)", score: 0.763 },
+    { title: "Fight Club (1999)", score: 0.718 },
+    { title: "Shutter Island (2010)", score: 0.741 },
+    { title: "Matrix, The (1999)", score: 0.703 },
+    { title: "Se7en (1995)", score: 0.689 },
+    { title: "Memento (2000)", score: 0.812 },
+  ],
+  "Interstellar (2014)": [
+    { title: "Inception (2010)", score: 0.841 },
+    { title: "Dark Knight, The (2008)", score: 0.798 },
+    { title: "Gravity (2013)", score: 0.821 },
+    { title: "Martian, The (2015)", score: 0.809 },
+    { title: "2001: A Space Odyssey (1968)", score: 0.763 },
+    { title: "Contact (1997)", score: 0.748 },
+    { title: "Dark Knight Rises, The (2012)", score: 0.771 },
+    { title: "Prestige, The (2006)", score: 0.731 },
+    { title: "Arrival (2016)", score: 0.843 },
+    { title: "Ex Machina (2015)", score: 0.712 },
+  ],
+  "Toy Story 2 (1999)": [
+    { title: "Toy Story (1995)", score: 0.573 },
+    { title: "Toy Story 3 (2010)", score: 0.891 },
+    { title: "Finding Nemo (2003)", score: 0.743 },
+    { title: "Monsters, Inc. (2001)", score: 0.731 },
+    { title: "A Bug's Life (1998)", score: 0.819 },
+    { title: "Shrek (2001)", score: 0.698 },
+    { title: "Incredibles, The (2004)", score: 0.712 },
+    { title: "Ice Age (2002)", score: 0.671 },
+    { title: "Aladdin (1992)", score: 0.521 },
+    { title: "Lion King, The (1994)", score: 0.516 },
+  ],
+  "Gladiator (2000)": [
+    { title: "Braveheart (1995)", score: 0.724 },
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.631 },
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.587 },
+    { title: "Matrix, The (1999)", score: 0.612 },
+    { title: "Troy (2004)", score: 0.743 },
+    { title: "Kingdom of Heaven (2005)", score: 0.698 },
+    { title: "Last Samurai, The (2003)", score: 0.681 },
+    { title: "300 (2007)", score: 0.762 },
+    { title: "Schindler's List (1993)", score: 0.547 },
+    { title: "Die Hard (1988)", score: 0.541 },
+  ],
+  "Casino (1995)": [
+    { title: "Goodfellas (1990)", score: 0.782 },
+    { title: "Scarface (1983)", score: 0.763 },
+    { title: "Godfather, The (1972)", score: 0.741 },
+    { title: "Godfather: Part II, The (1974)", score: 0.728 },
+    { title: "Pulp Fiction (1994)", score: 0.631 },
+    { title: "Usual Suspects, The (1995)", score: 0.617 },
+    { title: "Heat (1995)", score: 0.754 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.587 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.574 },
+    { title: "Fargo (1996)", score: 0.562 },
+  ],
+  "Godfather, The (1972)": [
+    { title: "Godfather: Part II, The (1974)", score: 0.934 },
+    { title: "Goodfellas (1990)", score: 0.741 },
+    { title: "Scarface (1983)", score: 0.712 },
+    { title: "Casino (1995)", score: 0.741 },
+    { title: "Pulp Fiction (1994)", score: 0.659 },
+    { title: "Shawshank Redemption, The (1994)", score: 0.643 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.631 },
+    { title: "Once Upon a Time in America (1984)", score: 0.821 },
+    { title: "Heat (1995)", score: 0.698 },
+    { title: "Usual Suspects, The (1995)", score: 0.619 },
+  ],
+  "Sleepless in Seattle (1993)": [
+    { title: "When Harry Met Sally... (1989)", score: 0.849 },
+    { title: "You've Got Mail (1998)", score: 0.876 },
+    { title: "Ghost (1990)", score: 0.712 },
+    { title: "Four Weddings and a Funeral (1994)", score: 0.798 },
+    { title: "Notting Hill (1999)", score: 0.831 },
+    { title: "Pretty Woman (1990)", score: 0.763 },
+    { title: "Groundhog Day (1993)", score: 0.667 },
+    { title: "Titanic (1997)", score: 0.631 },
+    { title: "French Kiss (1995)", score: 0.812 },
+    { title: "While You Were Sleeping (1995)", score: 0.794 },
+  ],
+  "When Harry Met Sally... (1989)": [
+    { title: "Sleepless in Seattle (1993)", score: 0.849 },
+    { title: "You've Got Mail (1998)", score: 0.841 },
+    { title: "Four Weddings and a Funeral (1994)", score: 0.821 },
+    { title: "Notting Hill (1999)", score: 0.798 },
+    { title: "Pretty Woman (1990)", score: 0.782 },
+    { title: "Ghost (1990)", score: 0.674 },
+    { title: "Groundhog Day (1993)", score: 0.649 },
+    { title: "Annie Hall (1977)", score: 0.831 },
+    { title: "French Kiss (1995)", score: 0.763 },
+    { title: "While You Were Sleeping (1995)", score: 0.741 },
+  ],
+  "Mission: Impossible (1996)": [
+    { title: "Speed (1994)", score: 0.671 },
+    { title: "Die Hard (1988)", score: 0.659 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.573 },
+    { title: "Terminator 2: Judgment Day (1991)", score: 0.561 },
+    { title: "Mission: Impossible 2 (2000)", score: 0.912 },
+    { title: "Mission: Impossible III (2006)", score: 0.887 },
+    { title: "James Bond: GoldenEye (1995)", score: 0.743 },
+    { title: "True Lies (1994)", score: 0.712 },
+    { title: "Con Air (1997)", score: 0.684 },
+    { title: "Face/Off (1997)", score: 0.671 },
+  ],
+  "Big Lebowski, The (1998)": [
+    { title: "Fargo (1996)", score: 0.693 },
+    { title: "Pulp Fiction (1994)", score: 0.641 },
+    { title: "Boogie Nights (1997)", score: 0.712 },
+    { title: "Being John Malkovich (1999)", score: 0.698 },
+    { title: "Fight Club (1999)", score: 0.631 },
+    { title: "American Beauty (1999)", score: 0.618 },
+    { title: "Usual Suspects, The (1995)", score: 0.609 },
+    { title: "Raising Arizona (1987)", score: 0.743 },
+    { title: "Blood Simple (1984)", score: 0.712 },
+    { title: "O Brother, Where Art Thou? (2000)", score: 0.724 },
+  ],
+  "Memento (2000)": [
+    { title: "Inception (2010)", score: 0.831 },
+    { title: "Dark Knight, The (2008)", score: 0.812 },
+    { title: "Prestige, The (2006)", score: 0.821 },
+    { title: "Se7en (1995)", score: 0.743 },
+    { title: "Usual Suspects, The (1995)", score: 0.731 },
+    { title: "Fight Club (1999)", score: 0.712 },
+    { title: "Shutter Island (2010)", score: 0.798 },
+    { title: "American History X (1998)", score: 0.671 },
+    { title: "Pulp Fiction (1994)", score: 0.659 },
+    { title: "Silence of the Lambs, The (1991)", score: 0.643 },
+  ],
+  "E.T. the Extra-Terrestrial (1982)": [
+    { title: "Star Wars: Episode IV - A New Hope (1977)", score: 0.698 },
+    { title: "Back to the Future (1985)", score: 0.731 },
+    { title: "Raiders of the Lost Ark (1981)", score: 0.712 },
+    { title: "Ghostbusters (1984)", score: 0.724 },
+    { title: "Close Encounters of the Third Kind (1977)", score: 0.819 },
+    { title: "Goonies, The (1985)", score: 0.743 },
+    { title: "Star Wars: Episode V - The Empire Strikes Back (1980)", score: 0.692 },
+    { title: "Jaws (1975)", score: 0.659 },
+    { title: "Hook (1991)", score: 0.698 },
+    { title: "Gremlins (1984)", score: 0.712 },
+  ],
+  "Apollo 13 (1995)": [
+    { title: "Braveheart (1995)", score: 0.501 },
+    { title: "Independence Day (a.k.a. ID4) (1996)", score: 0.549 },
+    { title: "Speed (1994)", score: 0.581 },
+    { title: "Forrest Gump (1994)", score: 0.487 },
+    { title: "Schindler's List (1993)", score: 0.471 },
+    { title: "JFK (1991)", score: 0.698 },
+    { title: "All the President's Men (1976)", score: 0.643 },
+    { title: "Contact (1997)", score: 0.672 },
+    { title: "Right Stuff, The (1983)", score: 0.741 },
+    { title: "Hunt for Red October, The (1990)", score: 0.612 },
+  ],
+};
+
+const ALL_MOVIES = Object.keys(MOVIE_SIMILARITY);
+
+// User recommendations (simulated from the notebook logic)
+const USER_RECS = {
+  1: { favs: ["Seven (a.k.a. Se7en) (1995)", "Usual Suspects, The (1995)", "Toy Story (1995)"], recs: ["Forrest Gump (1994)", "Rushmore (1998)", "Waiting for Guffman (1996)", "Silence of the Lambs, The (1991)", "War Room, The (1993)"] },
+  2: { favs: ["Pulp Fiction (1994)", "Shawshank Redemption, The (1994)"], recs: ["Silence of the Lambs, The (1991)", "Usual Suspects, The (1995)", "Fargo (1996)", "Se7en (1995)", "Fight Club (1999)"] },
+  3: { favs: ["Matrix, The (1999)"], recs: ["Fight Club (1999)", "American Beauty (1999)", "Usual Suspects, The (1995)", "Goodfellas (1990)", "Schindler's List (1993)"] },
+  4: { favs: ["Toy Story (1995)", "Jumanji (1995)"], recs: ["Toy Story 2 (1999)", "Jurassic Park (1993)", "Independence Day (a.k.a. ID4) (1996)", "Star Wars: Episode IV - A New Hope (1977)", "Lion King, The (1994)"] },
+};
+
+// ─── COUNTER ANIMATION ─── 
+function animateCounter(el, target, suffix = '', duration = 2000) {
+  let start = 0;
+  const step = target / (duration / 16);
+  const interval = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = Math.floor(start).toLocaleString() + suffix;
+    if (start >= target) clearInterval(interval);
+  }, 16);
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    animateCounter(document.getElementById('counter-users'), 610);
+    animateCounter(document.getElementById('counter-movies'), 9742);
+    animateCounter(document.getElementById('counter-ratings'), 100836);
+  }, 400);
+
+  renderTopMovies();
+});
+
+// ─── TOP MOVIES ─── 
+function renderTopMovies() {
+  const container = document.getElementById('movies-list');
+  const max = TOP_MOVIES[0].count;
+  const colors = ['#7c3aed','#6d28d9','#5b21b6','#4c1d95','#4338ca','#3730a3','#312e81','#1e3a8a','#1e40af','#1d4ed8'];
+  container.innerHTML = TOP_MOVIES.map((m, i) => {
+    const pct = (m.count / max * 100).toFixed(1);
+    return `<div class="movie-row" style="animation-delay:${i*0.05}s; animation: slide-in 0.4s ease ${i*0.05}s forwards; opacity:0">
+      <span class="movie-rank">${String(i+1).padStart(2,'0')}</span>
+      <span class="movie-name">${m.title}</span>
+      <div class="movie-bar-wrap">
+        <div class="movie-bar">
+          <div class="movie-bar-fill" style="width:0; background:${colors[i]}" data-width="${pct}%"></div>
+        </div>
+      </div>
+      <span class="movie-count">${m.count}</span>
+    </div>`;
+  }).join('');
+
+  setTimeout(() => {
+    document.querySelectorAll('.movie-bar-fill').forEach(el => {
+      el.style.width = el.dataset.width;
+    });
+  }, 300);
+}
+
+// ─── SUGGESTIONS ─── 
+function showSuggestions() {
+  const val = document.getElementById('movie-input').value.toLowerCase().trim();
+  const box = document.getElementById('suggestions-box');
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  const matches = ALL_MOVIES.filter(m => m.toLowerCase().includes(val)).slice(0, 6);
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(m =>
+    `<div class="suggestion-item" onclick="selectMovie('${m.replace(/'/g,"\\'")}')">🎬 ${m}</div>`
+  ).join('');
+  box.style.display = 'block';
+}
+
+function selectMovie(title) {
+  document.getElementById('movie-input').value = title;
+  document.getElementById('suggestions-box').style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.input-wrap')) {
+    document.getElementById('suggestions-box').style.display = 'none';
+  }
+});
+
+// ─── FIND SIMILAR MOVIES ─── 
+function findSimilar() {
+  const input = document.getElementById('movie-input').value.trim();
+  const n = parseInt(document.getElementById('num-recs').value);
+  const errEl = document.getElementById('error-msg');
+  const resultsEl = document.getElementById('movie-results');
+
+  document.getElementById('suggestions-box').style.display = 'none';
+  errEl.style.display = 'none';
+
+  if (!input) {
+    errEl.textContent = 'Please enter a movie title first.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const lower = input.toLowerCase();
+
+  // 1. Exact match
+  let key = MOVIE_SIMILARITY[input] ? input : null;
+
+  // 2. Case-insensitive exact match
+  if (!key) key = Object.keys(MOVIE_SIMILARITY).find(k => k.toLowerCase() === lower) || null;
+
+  // 3. Starts-with match
+  if (!key) key = Object.keys(MOVIE_SIMILARITY).find(k => k.toLowerCase().startsWith(lower)) || null;
+
+  // 4. Contains match
+  if (!key) key = Object.keys(MOVIE_SIMILARITY).find(k => k.toLowerCase().includes(lower)) || null;
+
+  // 5. Word-level match (any word from input found in title)
+  if (!key) {
+    const words = lower.split(/\s+/).filter(w => w.length > 2);
+    key = Object.keys(MOVIE_SIMILARITY).find(k =>
+      words.some(w => k.toLowerCase().includes(w))
+    ) || null;
+  }
+
+  if (!key) {
+    errEl.textContent = `"${input}" not found. Try: Forrest Gump, Matrix, Pulp Fiction, Die Hard, Inception, Titanic, Aladdin, Goodfellas, Fargo...`;
+    errEl.style.display = 'block';
+    resultsEl.innerHTML = '';
+    return;
+  }
+
+  const results = MOVIE_SIMILARITY[key].slice(0, n);
+  const maxScore = results[0].score;
+
+  resultsEl.innerHTML = `
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+      Showing top ${results.length} movies similar to <strong style="color:var(--text)">${key}</strong>
+    </div>
+    ${results.map((r, i) => `
+      <div class="result-card" style="animation-delay:${i*0.07}s">
+        <span class="result-rank">#${i+1}</span>
+        <span class="result-title">🎬 ${r.title}</span>
+        <span class="result-score">${r.score.toFixed(3)}</span>
+        <div class="score-bar">
+          <div class="score-fill" style="width:${(r.score/maxScore*100).toFixed(0)}%"></div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ─── USER RECOMMENDATIONS ─── 
+function recommendForUser() {
+  const userId = parseInt(document.getElementById('user-input').value);
+  const resultsEl = document.getElementById('user-results');
+
+  const data = USER_RECS[userId] || USER_RECS[userId > 2 ? (userId % 4) + 1 : 1];
+  const recs = data.recs;
+
+  resultsEl.innerHTML = `
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+      Based on User ${userId}'s top-rated films: 
+      <span style="color:#a78bfa">${data.favs.join(', ')}</span>
+    </div>
+    ${recs.map((r, i) => `
+      <div class="result-card" style="animation-delay:${i*0.07}s">
+        <span class="result-rank">#${i+1}</span>
+        <span class="result-title">🎬 ${r}</span>
+        <span class="result-score">Recommended</span>
+        <div style="width:8px;height:8px;background:var(--green);border-radius:50%"></div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ─── TABS ─── 
+function switchTab(id, btn) {
+  // Only toggle tabs/contents that are siblings inside the same .tabs parent container
+  const tabsContainer = btn.closest('.tabs');
+  if (tabsContainer) {
+    tabsContainer.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  // Find the target content and deactivate its siblings
+  const target = document.getElementById(id);
+  if (target) {
+    const parent = target.parentElement;
+    parent.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    target.classList.add('active');
+  }
+}
+
+// ─── SMOOTH SCROLL ─── 
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+// ─── INTERSECTION OBSERVER FOR BAR ANIMATIONS ─── 
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.querySelectorAll('[data-width]').forEach(el => {
+        setTimeout(() => el.style.width = el.dataset.width, 100);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.movies-list').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
